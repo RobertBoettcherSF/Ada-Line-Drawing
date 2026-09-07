@@ -280,7 +280,7 @@ package body Line_Drawing is
          begin
             Single (1) := (Coord => Start_Pt, Alpha => 1.0);
             return Single;
-         end declare;
+         end;
       end if;
 
       if Steep then
