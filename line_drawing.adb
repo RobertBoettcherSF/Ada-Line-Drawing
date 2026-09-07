@@ -32,6 +32,26 @@ package body Line_Drawing is
       return Positive (Chebyshev_Distance (P1, P2) + 1);
    end Expected_Point_Count;
 
+   --  Internal helper: normalizes endpoints so raster generation is perfectly
+   --  symmetric regardless of traversal direction Line(A, B) vs Line(B, A).
+   procedure Order_Endpoints
+     (P1, P2     : Point;
+      First_Pt   : out Point;
+      Second_Pt  : out Point;
+      Is_Swapped : out Boolean)
+   is
+   begin
+      if P1.X < P2.X or else (P1.X = P2.X and then P1.Y <= P2.Y) then
+         First_Pt   := P1;
+         Second_Pt  := P2;
+         Is_Swapped := False;
+      else
+         First_Pt   := P2;
+         Second_Pt  := P1;
+         Is_Swapped := True;
+      end if;
+   end Order_Endpoints;
+
    ----------------------------------------------------------------------
    --  Variant 1: Naive Line Algorithm
    ----------------------------------------------------------------------
@@ -127,56 +147,71 @@ package body Line_Drawing is
 
    ----------------------------------------------------------------------
    --  Variant 3: Bresenham's Line Algorithm
-   --  Canonical symmetric stepping along dominant axis
+   --  Strictly symmetric rasterization across forward and backward traversals
    ----------------------------------------------------------------------
    function Bresenham_Line (Start_Pt, End_Pt : Point) return Point_Array is
       Count : constant Positive := Expected_Point_Count (Start_Pt, End_Pt);
       Result : Point_Array (1 .. Count);
 
-      DX_Full : constant Long_Integer := Long_Integer (End_Pt.X) - Long_Integer (Start_Pt.X);
-      DY_Full : constant Long_Integer := Long_Integer (End_Pt.Y) - Long_Integer (Start_Pt.Y);
-      Step_X  : constant Long_Integer := (if DX_Full >= 0 then 1 else -1);
-      Step_Y  : constant Long_Integer := (if DY_Full >= 0 then 1 else -1);
-      Abs_DX  : constant Long_Integer := abs (DX_Full);
-      Abs_DY  : constant Long_Integer := abs (DY_Full);
-
-      Cur_X : Long_Integer := Long_Integer (Start_Pt.X);
-      Cur_Y : Long_Integer := Long_Integer (Start_Pt.Y);
+      P_A, P_B : Point;
+      Swapped  : Boolean;
    begin
       if Count = 1 then
          Result (1) := Start_Pt;
          return Result;
       end if;
 
-      if Abs_DX >= Abs_DY then
-         declare
-            Err : Long_Integer := 2 * Abs_DY - Abs_DX;
-         begin
-            for I in 1 .. Count loop
-               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
-               if Err > 0 then
-                  Cur_Y := Cur_Y + Step_Y;
-                  Err := Err - 2 * Abs_DX;
-               end if;
-               Err := Err + 2 * Abs_DY;
-               Cur_X := Cur_X + Step_X;
-            end loop;
-         end;
-      else
-         declare
-            Err : Long_Integer := 2 * Abs_DX - Abs_DY;
-         begin
-            for I in 1 .. Count loop
-               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
-               if Err > 0 then
+      Order_Endpoints (Start_Pt, End_Pt, P_A, P_B, Swapped);
+
+      declare
+         DX_Full : constant Long_Integer := Long_Integer (P_B.X) - Long_Integer (P_A.X);
+         DY_Full : constant Long_Integer := Long_Integer (P_B.Y) - Long_Integer (P_A.Y);
+         Step_X  : constant Long_Integer := (if DX_Full >= 0 then 1 else -1);
+         Step_Y  : constant Long_Integer := (if DY_Full >= 0 then 1 else -1);
+         Abs_DX  : constant Long_Integer := abs (DX_Full);
+         Abs_DY  : constant Long_Integer := abs (DY_Full);
+
+         Cur_X : Long_Integer := Long_Integer (P_A.X);
+         Cur_Y : Long_Integer := Long_Integer (P_A.Y);
+      begin
+         if Abs_DX >= Abs_DY then
+            declare
+               Err : Long_Integer := 2 * Abs_DY - Abs_DX;
+            begin
+               for I in 1 .. Count loop
+                  declare
+                     Target_Idx : constant Positive := (if Swapped then Count - I + 1 else I);
+                  begin
+                     Result (Target_Idx) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+                  end;
+                  if Err > 0 then
+                     Cur_Y := Cur_Y + Step_Y;
+                     Err := Err - 2 * Abs_DX;
+                  end if;
+                  Err := Err + 2 * Abs_DY;
                   Cur_X := Cur_X + Step_X;
-                  Err := Err - 2 * Abs_DY;
-               end if;
-               Err := Err + 2 * Abs_DX;
-               Cur_Y := Cur_Y + Step_Y;
-            end loop;
-         end;
-      end if;
+               end loop;
+            end;
+         else
+            declare
+               Err : Long_Integer := 2 * Abs_DX - Abs_DY;
+            begin
+               for I in 1 .. Count loop
+                  declare
+                     Target_Idx : constant Positive := (if Swapped then Count - I + 1 else I);
+                  begin
+                     Result (Target_Idx) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+                  end;
+                  if Err > 0 then
+                     Cur_X := Cur_X + Step_X;
+                     Err := Err - 2 * Abs_DY;
+                  end if;
+                  Err := Err + 2 * Abs_DX;
+                  Cur_Y := Cur_Y + Step_Y;
+               end loop;
+            end;
+         end if;
+      end;
 
       Result (1) := Start_Pt;
       Result (Count) := End_Pt;
@@ -185,63 +220,77 @@ package body Line_Drawing is
 
    ----------------------------------------------------------------------
    --  Variant 4: Midpoint Line Algorithm
+   --  Strictly symmetric rasterization across forward and backward traversals
    ----------------------------------------------------------------------
    function Midpoint_Line (Start_Pt, End_Pt : Point) return Point_Array is
       Count : constant Positive := Expected_Point_Count (Start_Pt, End_Pt);
       Result : Point_Array (1 .. Count);
 
-      DX_Full : constant Long_Integer := Long_Integer (End_Pt.X) - Long_Integer (Start_Pt.X);
-      DY_Full : constant Long_Integer := Long_Integer (End_Pt.Y) - Long_Integer (Start_Pt.Y);
-      Step_X  : constant Long_Integer := (if DX_Full >= 0 then 1 else -1);
-      Step_Y  : constant Long_Integer := (if DY_Full >= 0 then 1 else -1);
-      Abs_DX  : constant Long_Integer := abs (DX_Full);
-      Abs_DY  : constant Long_Integer := abs (DY_Full);
-
-      Cur_X : Long_Integer := Long_Integer (Start_Pt.X);
-      Cur_Y : Long_Integer := Long_Integer (Start_Pt.Y);
+      P_A, P_B : Point;
+      Swapped  : Boolean;
    begin
       if Count = 1 then
          Result (1) := Start_Pt;
          return Result;
       end if;
 
-      if Abs_DX >= Abs_DY then
-         --  Dominant X axis: Decision parameter d = 2*dy - dx
-         declare
-            D       : Long_Integer := 2 * Abs_DY - Abs_DX;
-            Inc_E   : constant Long_Integer := 2 * Abs_DY;
-            Inc_NE  : constant Long_Integer := 2 * (Abs_DY - Abs_DX);
-         begin
-            for I in 1 .. Count loop
-               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
-               if D > 0 then
-                  Cur_Y := Cur_Y + Step_Y;
-                  D := D + Inc_NE;
-               else
-                  D := D + Inc_E;
-               end if;
-               Cur_X := Cur_X + Step_X;
-            end loop;
-         end;
-      else
-         --  Dominant Y axis: Decision parameter d = 2*dx - dy
-         declare
-            D       : Long_Integer := 2 * Abs_DX - Abs_DY;
-            Inc_N   : constant Long_Integer := 2 * Abs_DX;
-            Inc_NE  : constant Long_Integer := 2 * (Abs_DX - Abs_DY);
-         begin
-            for I in 1 .. Count loop
-               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
-               if D > 0 then
+      Order_Endpoints (Start_Pt, End_Pt, P_A, P_B, Swapped);
+
+      declare
+         DX_Full : constant Long_Integer := Long_Integer (P_B.X) - Long_Integer (P_A.X);
+         DY_Full : constant Long_Integer := Long_Integer (P_B.Y) - Long_Integer (P_A.Y);
+         Step_X  : constant Long_Integer := (if DX_Full >= 0 then 1 else -1);
+         Step_Y  : constant Long_Integer := (if DY_Full >= 0 then 1 else -1);
+         Abs_DX  : constant Long_Integer := abs (DX_Full);
+         Abs_DY  : constant Long_Integer := abs (DY_Full);
+
+         Cur_X : Long_Integer := Long_Integer (P_A.X);
+         Cur_Y : Long_Integer := Long_Integer (P_A.Y);
+      begin
+         if Abs_DX >= Abs_DY then
+            declare
+               D      : Long_Integer := 2 * Abs_DY - Abs_DX;
+               Inc_E  : constant Long_Integer := 2 * Abs_DY;
+               Inc_NE : constant Long_Integer := 2 * (Abs_DY - Abs_DX);
+            begin
+               for I in 1 .. Count loop
+                  declare
+                     Target_Idx : constant Positive := (if Swapped then Count - I + 1 else I);
+                  begin
+                     Result (Target_Idx) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+                  end;
+                  if D > 0 then
+                     Cur_Y := Cur_Y + Step_Y;
+                     D := D + Inc_NE;
+                  else
+                     D := D + Inc_E;
+                  end if;
                   Cur_X := Cur_X + Step_X;
-                  D := D + Inc_NE;
-               else
-                  D := D + Inc_N;
-               end if;
-               Cur_Y := Cur_Y + Step_Y;
-            end loop;
-         end;
-      end if;
+               end loop;
+            end;
+         else
+            declare
+               D      : Long_Integer := 2 * Abs_DX - Abs_DY;
+               Inc_N  : constant Long_Integer := 2 * Abs_DX;
+               Inc_NE : constant Long_Integer := 2 * (Abs_DX - Abs_DY);
+            begin
+               for I in 1 .. Count loop
+                  declare
+                     Target_Idx : constant Positive := (if Swapped then Count - I + 1 else I);
+                  begin
+                     Result (Target_Idx) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+                  end;
+                  if D > 0 then
+                     Cur_X := Cur_X + Step_X;
+                     D := D + Inc_NE;
+                  else
+                     D := D + Inc_N;
+                  end if;
+                  Cur_Y := Cur_Y + Step_Y;
+               end loop;
+            end;
+         end if;
+      end;
 
       Result (1) := Start_Pt;
       Result (Count) := End_Pt;
