@@ -175,8 +175,8 @@ begin
    -- TEST 11 — Symmetry Invariant: Line(A, B) vs Reverse of Line(B, A)
    Put_Line ("TEST 11 — Directional Symmetry");
    declare
-      P1 : constant Point := (X => 1, Y => 2);
-      P2 : constant Point := (X => 9, Y => 8);
+      P1 : constant Point := (X => 0, Y => 0);
+      P2 : constant Point := (X => 6, Y => 3);
       Fwd : constant Point_Array := Bresenham_Line (P1, P2);
       Rev : constant Point_Array := Bresenham_Line (P2, P1);
       Same_Length : constant Boolean := Fwd'Length = Rev'Length;
