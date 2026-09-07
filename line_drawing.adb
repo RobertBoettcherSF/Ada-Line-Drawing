@@ -126,43 +126,59 @@ package body Line_Drawing is
    end DDA_Line;
 
    ----------------------------------------------------------------------
-   --  Variant 3: Bresenham's Integer Line Algorithm (All Octants)
+   --  Variant 3: Bresenham's Line Algorithm
+   --  Canonical symmetric stepping along dominant axis
    ----------------------------------------------------------------------
    function Bresenham_Line (Start_Pt, End_Pt : Point) return Point_Array is
       Count : constant Positive := Expected_Point_Count (Start_Pt, End_Pt);
       Result : Point_Array (1 .. Count);
 
-      X0 : Long_Integer := Long_Integer (Start_Pt.X);
-      Y0 : Long_Integer := Long_Integer (Start_Pt.Y);
-      X1 : constant Long_Integer := Long_Integer (End_Pt.X);
-      Y1 : constant Long_Integer := Long_Integer (End_Pt.Y);
+      DX_Full : constant Long_Integer := Long_Integer (End_Pt.X) - Long_Integer (Start_Pt.X);
+      DY_Full : constant Long_Integer := Long_Integer (End_Pt.Y) - Long_Integer (Start_Pt.Y);
+      Step_X  : constant Long_Integer := (if DX_Full >= 0 then 1 else -1);
+      Step_Y  : constant Long_Integer := (if DY_Full >= 0 then 1 else -1);
+      Abs_DX  : constant Long_Integer := abs (DX_Full);
+      Abs_DY  : constant Long_Integer := abs (DY_Full);
 
-      DX : constant Long_Integer := abs (X1 - X0);
-      DY : constant Long_Integer := -abs (Y1 - Y0);
-      SX : constant Long_Integer := (if X0 < X1 then 1 else -1);
-      SY : constant Long_Integer := (if Y0 < Y1 then 1 else -1);
-      Err : Long_Integer := DX + DY;
-      E2  : Long_Integer;
-      Idx : Positive := 1;
+      Cur_X : Long_Integer := Long_Integer (Start_Pt.X);
+      Cur_Y : Long_Integer := Long_Integer (Start_Pt.Y);
    begin
-      loop
-         Result (Idx) := (X => Coordinate (X0), Y => Coordinate (Y0));
-         exit when (X0 = X1 and then Y0 = Y1) or else Idx = Count;
+      if Count = 1 then
+         Result (1) := Start_Pt;
+         return Result;
+      end if;
 
-         Idx := Idx + 1;
-         E2 := 2 * Err;
+      if Abs_DX >= Abs_DY then
+         declare
+            Err : Long_Integer := 2 * Abs_DY - Abs_DX;
+         begin
+            for I in 1 .. Count loop
+               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+               if Err > 0 then
+                  Cur_Y := Cur_Y + Step_Y;
+                  Err := Err - 2 * Abs_DX;
+               end if;
+               Err := Err + 2 * Abs_DY;
+               Cur_X := Cur_X + Step_X;
+            end loop;
+         end;
+      else
+         declare
+            Err : Long_Integer := 2 * Abs_DX - Abs_DY;
+         begin
+            for I in 1 .. Count loop
+               Result (I) := (X => Coordinate (Cur_X), Y => Coordinate (Cur_Y));
+               if Err > 0 then
+                  Cur_X := Cur_X + Step_X;
+                  Err := Err - 2 * Abs_DY;
+               end if;
+               Err := Err + 2 * Abs_DX;
+               Cur_Y := Cur_Y + Step_Y;
+            end loop;
+         end;
+      end if;
 
-         if E2 >= DY then
-            Err := Err + DY;
-            X0 := X0 + SX;
-         end if;
-
-         if E2 <= DX then
-            Err := Err + DX;
-            Y0 := Y0 + SY;
-         end if;
-      end loop;
-
+      Result (1) := Start_Pt;
       Result (Count) := End_Pt;
       return Result;
    end Bresenham_Line;
