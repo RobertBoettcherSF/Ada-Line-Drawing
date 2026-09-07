@@ -132,8 +132,8 @@ begin
    Put_Line ("TEST 9 — All Octants Traversal");
    declare
       Targets : constant array (1 .. 8) of Point :=
-        ((5, 2), (2, 5), (-2, 5), (-5, 2),
-         (-5, -2), (-2, -5), (2, -5), (5, -2));
+        [(5, 2), (2, 5), (-2, 5), (-5, 2),
+         (-5, -2), (-2, -5), (2, -5), (5, -2)];
       All_Valid : Boolean := True;
       All_Connected : Boolean := True;
       All_Endpoints : Boolean := True;
